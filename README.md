@@ -3,7 +3,9 @@
 <img src="tool.png" alt="Image" width="640px">
 
 
-AOSPA Fastboot Flashing Kit is a material UI based helper tool to allow users to flash aospa(paranoid) custom rom on their Marble device. No more CLI invocation is needed to switch to experience AOSPA.
+AOSPA Fastboot Flashing Kit is a material UI based helper tool to allow users to flash aospa(paranoid) custom rom on their Marble device. This project is an extension to https://github.com/ghostrider-reborn/aospa-flashing-kit.git
+
+No more CLI invocation is needed to experience AOSPA.
 
 Features:
 - Less errorprone
@@ -30,18 +32,19 @@ Download the required firmware and fastboot ROM file from aospa.co.
 
 Boot your phone to Fastboot mode. (Power + Volume Down)
 
-&#8594; Step1: Check Flash Firmware and select the firmware zip file (Skip this - if already on recommended firmware)
+&#8594; Step1: Check `Flash Firmware` and select the firmware zip file (Skip this - if already on recommended firmware)
 
-&#8594; Step2: Check Flash ROM and select the rom zip file
+&#8594; Step2: Check `Flash ROM` and select the rom zip file
 
-&#8594; Step3: Click the Flash button.
+&#8594; Step3: Click the `Start Flash` button.
 
-Once the  flashing is completed. Click Reboot button.
+Once the flashing is completed. Click Reboot button.
 
 Flashing might take 5 to 10 minutes depending on the underlying hardware.
 
 ## Limitations
-- No realtime output. Log output displayed as buffered streams which comes with some delay.
+- No realtime output.
+- Log output displayed as buffered streams which comes with some delay.
 
 ## Roadmap
 - allow driver installation on windows
