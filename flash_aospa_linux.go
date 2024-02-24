@@ -1,3 +1,6 @@
+//go:build linux || darwin
+// +build linux darwin
+
 package main
 
 import (
@@ -11,16 +14,80 @@ import (
 	"strings"
 
 	"archive/zip"
+	"image/color"
 	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+
+	// "fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"gopkg.in/src-d/go-git.v4"
 )
+
+type myTheme struct{}
+
+func (myTheme) Color(c fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
+	switch c {
+	case theme.ColorNameDisabledButton:
+		return color.NRGBA{R: 0x26, G: 0x26, B: 0x26, A: 0xff}
+	case theme.ColorNameDisabled:
+		return color.NRGBA{R: 0x42, G: 0xfd, B: 0xe1, A: 0xfd}
+	case theme.ColorNameScrollBar:
+		return color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0x99}
+	case theme.ColorNameShadow:
+		return color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0x66}
+	default:
+		return theme.DefaultTheme().Color(c, v)
+	}
+}
+
+func (myTheme) Font(s fyne.TextStyle) fyne.Resource {
+	if s.Monospace {
+		return theme.DefaultTheme().Font(s)
+	}
+	if s.Bold {
+		if s.Italic {
+			return theme.DefaultTheme().Font(s)
+		}
+		return theme.DefaultTheme().Font(s)
+	}
+	if s.Italic {
+		return theme.DefaultTheme().Font(s)
+	}
+	return theme.DefaultTheme().Font(s)
+}
+
+func (myTheme) Icon(n fyne.ThemeIconName) fyne.Resource {
+	return theme.DefaultTheme().Icon(n)
+}
+
+func (myTheme) Size(s fyne.ThemeSizeName) float32 {
+	switch s {
+	case theme.SizeNameCaptionText:
+		return 11
+	case theme.SizeNameInlineIcon:
+		return 20
+	case theme.SizeNamePadding:
+		return 4
+	case theme.SizeNameScrollBar:
+		return 16
+	case theme.SizeNameScrollBarSmall:
+		return 12
+	case theme.SizeNameSeparatorThickness:
+		return 1
+	case theme.SizeNameText:
+		return 14
+	case theme.SizeNameInputBorder:
+		return 2
+	default:
+		return theme.DefaultTheme().Size(s)
+	}
+}
 
 // Function to validate the firmware zip file
 func validatezip(zipFile string) {
@@ -30,7 +97,7 @@ func validatezip(zipFile string) {
 	// Open the zip file
 	fmFile, err := zip.OpenReader(zipFilePath)
 	if err != nil {
-		fmt.Println("Invalid Firmware File..aborting", err)
+		fmt.Println("Invalid Firmware File..abortiflash_aospa_linux.gong", err)
 		os.Exit(1)
 	}
 	defer fmFile.Close()
@@ -55,23 +122,23 @@ func validatezip(zipFile string) {
 func getfastbootinfo(destDir string, outputTextArea *widget.Entry) {
 	var outputBuffer2 bytes.Buffer
 
-	cmd2 := exec.Command(destDir+"/platform-tools-windows/fastboot", "getvar", "all")
-	cmd2.Dir = destDir
+	cmd := exec.Command(destDir+"/platform-tools-windows/fastboot", "getvar", "all")
+	cmd.Dir = destDir
 
-	cmd2.Stdout = &outputBuffer2
-	cmd2.Stderr = &outputBuffer2
-	err3 := cmd2.Start()
-	if err3 != nil {
-		fmt.Println("Error starting command:", err3)
+	cmd.Stdout = &outputBuffer2
+	cmd.Stderr = &outputBuffer2
+	err := cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting command:", err)
 		return
 	}
-	cmd2.Wait()
+	cmd.Wait()
 
-	scanner2 := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
-	scanner2.Split(bufio.ScanLines)
+	scanner := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
+	scanner.Split(bufio.ScanLines)
 
-	for scanner2.Scan() {
-		m := scanner2.Text()
+	for scanner.Scan() {
+		m := scanner.Text()
 		fmt.Println(m)
 		outputTextArea.SetText(outputTextArea.Text + "\n" + m)
 		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
@@ -81,23 +148,23 @@ func getfastbootinfo(destDir string, outputTextArea *widget.Entry) {
 // Function to flash ROM
 func flashrom(destDir string, outputTextArea *widget.Entry) {
 	var outputBuffer2 bytes.Buffer
-	cmd3 := exec.Command("bash", "flash_aospa.sh")
-	cmd3.Dir = destDir
+	cmd := exec.Command("bash", "flash_aospa.sh")
+	cmd.Dir = destDir
 
-	cmd3.Stdout = &outputBuffer2
-	cmd3.Stderr = &outputBuffer2
-	err3 := cmd3.Start()
-	if err3 != nil {
-		fmt.Println("Error starting command:", err3)
+	cmd.Stdout = &outputBuffer2
+	cmd.Stderr = &outputBuffer2
+	err := cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting command:", err)
 		return
 	}
-	cmd3.Wait()
+	cmd.Wait()
 
-	scanner2 := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
-	scanner2.Split(bufio.ScanLines)
+	scanner := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
+	scanner.Split(bufio.ScanLines)
 
-	for scanner2.Scan() {
-		m := scanner2.Text()
+	for scanner.Scan() {
+		m := scanner.Text()
 		fmt.Println(m)
 		outputTextArea.SetText(outputTextArea.Text + "\n" + m)
 		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
@@ -107,25 +174,23 @@ func flashrom(destDir string, outputTextArea *widget.Entry) {
 // Function to flash firmware
 func flashfirmware(destDir string, outputTextArea *widget.Entry) {
 	var outputBuffer2 bytes.Buffer
-	// lightTheme := theme.LightTheme()
-	// app.Settings().SetTheme(lightTheme)
-	cmd3 := exec.Command("bash", "flash_firmware.sh")
-	cmd3.Dir = destDir
+	cmd := exec.Command("bash", "flash_firmware.sh")
+	cmd.Dir = destDir
 
-	cmd3.Stdout = &outputBuffer2
-	cmd3.Stderr = &outputBuffer2
-	err3 := cmd3.Start()
-	if err3 != nil {
-		fmt.Println("Error starting command:", err3)
+	cmd.Stdout = &outputBuffer2
+	cmd.Stderr = &outputBuffer2
+	err := cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting command:", err)
 		return
 	}
-	cmd3.Wait()
+	cmd.Wait()
 
-	scanner2 := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
-	scanner2.Split(bufio.ScanLines)
+	scanner := bufio.NewScanner(bytes.NewReader(outputBuffer2.Bytes()))
+	scanner.Split(bufio.ScanLines)
 
-	for scanner2.Scan() {
-		m := scanner2.Text()
+	for scanner.Scan() {
+		m := scanner.Text()
 		fmt.Println(m)
 		outputTextArea.SetText(outputTextArea.Text + "\n" + m)
 		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
@@ -145,7 +210,8 @@ func main() {
 	destDir := filepath.Dir(ex) + "/aospa-flashing-kit"
 
 	a := app.New()
-	w := a.NewWindow("AOSPA[Marble] Flash Tool - NooB Edition")
+	a.Settings().SetTheme(&myTheme{})
+	w := a.NewWindow("AOSPA Fastboot Flashing Kit - Marble Edition")
 
 	// Create the checkbox1
 	flashCheckbox0 := widget.NewCheck("Flash ROM", nil)
@@ -180,7 +246,7 @@ func main() {
 
 	outputTextArea.TextStyle.Monospace = true
 	// outputTextArea.TextStyle.Italic = true
-	outputTextArea.Enable()
+	outputTextArea.Disable()
 
 	srcFile := ""
 	browseButton := widget.NewButton("Open Fastboot ROM Zip", func() {
@@ -205,6 +271,9 @@ func main() {
 		} else {
 			input2.Hide()
 			browseButton.Hide()
+			w.Resize(fyne.NewSize(920, 400))
+			w.Content().Refresh()
+
 		}
 	}
 
@@ -218,6 +287,9 @@ func main() {
 		} else {
 			input3.Hide()
 			browseButton2.Hide()
+			w.Resize(fyne.NewSize(920, 400))
+			w.Content().Refresh()
+			// w.Content().Resize(fyne.NewSize(920, 400))
 		}
 	}
 
@@ -235,7 +307,6 @@ func main() {
 		})
 		if err2 != nil {
 			fmt.Println("Error cloning repository:", err)
-			return
 		}
 		outputTextArea.SetText(outputTextArea.Text + "Repository cloned successfully" + "\n")
 
@@ -263,7 +334,7 @@ func main() {
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Getting Fastboot Info")
 
 			getfastbootinfo(destDir, outputTextArea)
-			
+
 			validatezip(destDir + "/firmware.zip")
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Firmware ..." + "\n" + "Please wait ...")
@@ -271,6 +342,7 @@ func main() {
 			flashfirmware(destDir, outputTextArea)
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed. Reboot your device now" + "\n")
+			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
 		}
 		if flashCheckbox0.Checked {
 
@@ -302,26 +374,33 @@ func main() {
 			flashrom(destDir, outputTextArea)
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed. Reboot your device now" + "\n")
+			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
 		}
 	})
 
 	// Create the Reboot button and add functionality
 	submitButton2 := widget.NewButton("Reboot Phone", func() {
-		outputTextArea.SetText(outputTextArea.Text + "\n" + "Rebooting Phone ...")
+		if _, err := os.Stat(destDir + "/platform-tools-linux/fastboot"); err == nil || os.IsExist(err) {
 
-		cmd2, _ := exec.Command("fastboot", "reboot").CombinedOutput()
+			outputTextArea.SetText(outputTextArea.Text + "\n" + "Rebooting Phone ...")
 
-		scanner := bufio.NewScanner(bytes.NewReader(cmd2))
-		scanner.Split(bufio.ScanLines)
+			cmd2, _ := exec.Command("fastboot", "reboot").CombinedOutput()
 
-		for scanner.Scan() {
-			m := scanner.Text()
-			fmt.Println(m)
-			outputTextArea.SetText(outputTextArea.Text + "\n" + m)
-			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+			scanner := bufio.NewScanner(bytes.NewReader(cmd2))
+			scanner.Split(bufio.ScanLines)
+
+			for scanner.Scan() {
+				m := scanner.Text()
+				fmt.Println(m)
+				outputTextArea.SetText(outputTextArea.Text + "\n" + m)
+				outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+			}
+		} else {
+			outputTextArea.SetText(outputTextArea.Text + "\n" + "Fastboot not found. Please flash and invoke this command again.")
+			return
 		}
 
-		outputTextArea.SetText(outputTextArea.Text + "\n" + "Phone rebooted")
+		// outputTextArea.SetText(outputTextArea.Text + "\n" + "Phone rebooted")
 	})
 
 	// Create a vertical layout for the central widget
@@ -329,10 +408,11 @@ func main() {
 
 	buttonContainer := container.NewHBox(submitButton, submitButton2)
 	buttonContainer.Layout = layout.NewHBoxLayout()
-	layout := container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton, buttonContainer, outputTextArea)
+	// layout := container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton, buttonContainer, outputTextArea)
+	layout := container.NewBorder(container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton), outputTextArea, nil, nil, container.NewVBox(buttonContainer))
 
 	// Set the layout as the content of the window
-	w.Resize(fyne.NewSize(920, 600))
+	w.Resize(fyne.NewSize(920, 400))
 	w.SetContent(layout)
 	w.CenterOnScreen()
 
