@@ -341,7 +341,7 @@ func main() {
 
 			flashfirmware(destDir, outputTextArea)
 
-			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed. Reboot your device now" + "\n")
+			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed." + "\n")
 			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
 		}
 		if flashCheckbox0.Checked {
@@ -370,7 +370,7 @@ func main() {
 
 			flashrom(destDir, outputTextArea)
 
-			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed. Reboot your device now" + "\n")
+			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing Completed. Reboot your device now!" + "\n")
 			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
 		}
 	})
