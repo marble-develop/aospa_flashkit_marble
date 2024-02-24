@@ -245,7 +245,7 @@ func main() {
 
 	// Create the text area to display printf outputs
 	outputTextArea := widget.NewMultiLineEntry()
-	// outputTextArea.Wrapping = fyne.TextWrapBreak
+	outputTextArea.Wrapping = fyne.TextWrapBreak
 	outputTextArea.SetMinRowsVisible(24)
 
 	outputTextArea.TextStyle.Monospace = true

@@ -122,7 +122,7 @@ func validatezip(zipFile string) {
 func getfastbootinfo(destDir string, outputTextArea *widget.Entry) {
 	var outputBuffer2 bytes.Buffer
 
-	cmd := exec.Command(destDir+"/platform-tools-windows/fastboot", "getvar", "all")
+	cmd := exec.Command(destDir+"/platform-tools-linux/fastboot", "getvar", "all")
 	cmd.Dir = destDir
 
 	cmd.Stdout = &outputBuffer2
@@ -241,7 +241,7 @@ func main() {
 
 	// Create the text area to display printf outputs
 	outputTextArea := widget.NewMultiLineEntry()
-	// outputTextArea.Wrapping = fyne.TextWrapBreak
+	outputTextArea.Wrapping = fyne.TextWrapBreak
 	outputTextArea.SetMinRowsVisible(24)
 
 	outputTextArea.TextStyle.Monospace = true
