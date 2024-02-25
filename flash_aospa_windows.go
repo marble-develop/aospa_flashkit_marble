@@ -6,7 +6,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 
 	"bytes"
 	"os"
@@ -31,6 +33,19 @@ import (
 )
 
 type myTheme struct{}
+
+func cloneRepo(repoURL, destDir string, outputTextArea *widget.Entry) {
+	_, err := git.PlainClone(destDir, false, &git.CloneOptions{
+		URL:      repoURL,
+		Progress: os.Stdout,
+	})
+	if err != nil {
+		fmt.Println("Error cloning repository", err)
+	}
+	fmt.Printf("Cloning ghostrider-reborn Kit to: %s\n", destDir)
+	outputTextArea.SetText("Cloning ghostrider-reborn Kit to: " + destDir + "\n")
+	outputTextArea.SetText(outputTextArea.Text + "Repository cloned successfully" + "\n")
+}
 
 func (myTheme) Color(c fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
 	switch c {
@@ -120,6 +135,119 @@ func validatezip(zipFile string) {
 		fmt.Println("Firmware ZIP detected")
 	}
 
+}
+
+func extractFileFromZip(zipFile, fileName string) error {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	r, err := zip.OpenReader(zipFile)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		if f.Name == fileName {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			path := filepath.Dir(ex) + "\\" + fileName
+			w, err := os.Create(path)
+			if err != nil {
+				return err
+			}
+			defer w.Close()
+
+			_, err = io.Copy(w, rc)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func downloadFile(url, zipFile string) error {
+	// Download the file
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the zip file
+	out, err := os.Create(zipFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Copy the downloaded file to the zip file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// Extract all files from the zip file
+	r, err := zip.OpenReader(zipFile)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	return nil
+}
+
+func Unzip(source, destination string) error {
+	archive, err := zip.OpenReader(source)
+	if err != nil {
+		return err
+	}
+	defer archive.Close()
+	for _, file := range archive.Reader.File {
+		reader, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+		path := filepath.Join(destination, file.Name)
+		// Remove file if it already exists; no problem if it doesn't; other cases can error out below
+		_ = os.Remove(path)
+		// Create a directory at path, including parents
+		err = os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		// If file is _supposed_ to be a directory, we're done
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		// otherwise, remove that directory (_not_ including parents)
+		err = os.Remove(path)
+		if err != nil {
+			return err
+		}
+		// and create the actual file.  This ensures that the parent directories exist!
+		// An archive may have a single file with a nested path, rather than a file for each parent dir
+		writer, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			return err
+		}
+		defer writer.Close()
+		_, err = io.Copy(writer, reader)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Function to get fastboot info
@@ -224,9 +352,11 @@ func main() {
 	// Create the text input fields
 	input2 := widget.NewEntry()
 	input3 := widget.NewEntry()
+	input4 := widget.NewEntry()
 
 	// Create the checkbox2
 	flashCheckbox := widget.NewCheck("Flash Firmware", nil)
+	flashCheckbox1 := widget.NewCheck("Custom Kernel", nil)
 
 	// Create the browse button2
 	srcFile2 := ""
@@ -238,6 +368,19 @@ func main() {
 				srcFile2 = strings.TrimPrefix(selectedFile, "file://")
 				fmt.Printf("Selected file: %s\n", selectedFile)
 				input3.SetText(selectedFile) // Store the selected file in input3 text field
+			}
+		}, w)
+		dialog.Show()
+	})
+	kernelsrcFile := ""
+	browseButton3 := widget.NewButton("Open Kernel Zip", func() {
+		dialog := dialog.NewFileOpen(func(file fyne.URIReadCloser, err error) {
+			if err == nil && file != nil {
+				// Handle the selected file
+				selectedFile := file.URI().String()
+				kernelsrcFile = strings.TrimPrefix(selectedFile, "file://")
+				fmt.Printf("Selected file: %s\n", selectedFile)
+				input4.SetText(selectedFile)
 			}
 		}, w)
 		dialog.Show()
@@ -297,23 +440,29 @@ func main() {
 		}
 	}
 
+	// Hide the text input fields and browse button
+	input4.Hide()
+	browseButton3.Hide()
+	flashCheckbox1.OnChanged = func(checked bool) {
+		if checked {
+			input2.Show()
+			browseButton.Show()
+			input4.Show()
+			browseButton3.Show()
+		} else {
+			input4.Hide()
+			browseButton3.Hide()
+			input2.Hide()
+			browseButton.Hide()
+			w.Resize(fyne.NewSize(920, 400))
+			w.Content().Refresh()
+
+		}
+	}
+
 	// Create the Flash button and add functionality
 	submitButton := widget.NewButton("Start Flash", func() {
-
-		fmt.Printf("Cloning ghostrider-reborn Kit to: %s\n", destDir)
-		outputTextArea.SetText("Cloning ghostrider-reborn Kit to: " + destDir + "\n")
-
-		// Clone the repository
-
-		_, err2 := git.PlainClone(destDir, false, &git.CloneOptions{
-			URL:      repoURL,
-			Progress: os.Stdout,
-		})
-		if err2 != nil {
-			fmt.Println("Error cloning repository:", err)
-		}
-		outputTextArea.SetText(outputTextArea.Text + "Repository cloned successfully" + "\n")
-
+		cloneRepo(repoURL, destDir, outputTextArea)
 		if flashCheckbox.Checked {
 
 			outputTextArea.SetText(outputTextArea.Text + "Copying Firmware Source ..." + "\n")
@@ -362,7 +511,7 @@ func main() {
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Getting Fastboot Info")
 
-			getfastbootinfo(destDir, outputTextArea)
+			// getfastbootinfo(destDir, outputTextArea)
 			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Flashing ROM ..." + "\n" + "Please wait ...")
@@ -377,6 +526,7 @@ func main() {
 
 	// Create the Reboot button and add functionality
 	submitButton2 := widget.NewButton("Reboot Phone", func() {
+		cloneRepo(repoURL, destDir, outputTextArea)
 		if _, err := os.Stat(destDir + "\\platform-tools-windows\\fastboot.exe"); err == nil || os.IsExist(err) {
 
 			outputTextArea.SetText(outputTextArea.Text + "\n" + "Rebooting Phone ...")
@@ -400,13 +550,85 @@ func main() {
 		// outputTextArea.SetText(outputTextArea.Text + "\n" + "Phone rebooted")
 	})
 
+	// Create the Reboot button and add functionality
+	submitButton3 := widget.NewButton("Flash Kernel", func() {
+		cloneRepo(repoURL, destDir, outputTextArea)
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Extracting boot.img from AOSPA source...")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		extractFileFromZip(srcFile, "boot.img")
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Downloading magiskboot...")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		downloadFile("https://github.com/svoboda18/magiskboot/releases/download/1.0-3/magiskboot.zip", filepath.Dir(ex)+"\\Magisk.zip")
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Extracting magiskboot...")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		Unzip(filepath.Dir(ex)+"\\Magisk.zip", filepath.Dir(ex)+"\\magiskboot")
+
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Patching boot.img ...")
+
+		cmd := exec.Command(filepath.Dir(ex)+"\\magiskboot\\magiskboot.exe", "unpack", filepath.Dir(ex)+"\\boot.img")
+		cmd.Dir = filepath.Dir(ex)
+
+		output, _ := cmd.CombinedOutput()
+		scanner := bufio.NewScanner(bytes.NewReader(output))
+		scanner.Split(bufio.ScanLines)
+
+		for scanner.Scan() {
+			m := scanner.Text()
+			fmt.Println(m)
+			outputTextArea.SetText(outputTextArea.Text + "\n" + m)
+			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		}
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Extracting kernel Image from kernel source ...")
+		extractFileFromZip(kernelsrcFile, "Image")
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Kernel extracted.")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+
+		// Copy File
+		bytesRead, err := os.ReadFile(filepath.Dir(ex) + "\\Image")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = os.WriteFile(filepath.Dir(ex)+"\\kernel", bytesRead, 0644)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Patching kernel ...")
+		cmd = exec.Command(filepath.Dir(ex)+"\\magiskboot\\magiskboot.exe", "repack", filepath.Dir(ex)+"\\boot.img")
+		cmd.Dir = filepath.Dir(ex)
+		cmd.Run()
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Patching completed.")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Installing new kernel...")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		cmd = exec.Command(destDir+"\\platform-tools-windows\\fastboot.exe", "reboot", "fastboot")
+		cmd.Dir = filepath.Dir(ex)
+		cmd.Run()
+		cmd2, _ := exec.Command(destDir+"\\platform-tools-windows\\fastboot.exe", "flash", "boot", filepath.Dir(ex)+"\\new-boot.img").CombinedOutput()
+
+		scanner = bufio.NewScanner(bytes.NewReader(cmd2))
+		scanner.Split(bufio.ScanLines)
+
+		for scanner.Scan() {
+			m := scanner.Text()
+			fmt.Println(m)
+			outputTextArea.SetText(outputTextArea.Text + "\n" + m)
+			outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+		}
+		outputTextArea.SetText(outputTextArea.Text + "\n" + "Completed. Please reboot your device.")
+		outputTextArea.CursorRow = outputTextArea.CursorRow + 1
+	})
+
 	// Create a vertical layout for the central widget
 	outputTextArea.SetText("Waiting for logs ...")
 
-	buttonContainer := container.NewHBox(submitButton, submitButton2)
+	buttonContainer := container.NewHBox(submitButton, submitButton2, submitButton3)
 	buttonContainer.Layout = layout.NewHBoxLayout()
 	// layout := container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton, buttonContainer, outputTextArea)
-	layout := container.NewBorder(container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton), outputTextArea, nil, nil, container.NewVBox(buttonContainer))
+	layout := container.NewBorder(container.NewVBox(flashCheckbox, input3, browseButton2, flashCheckbox0, input2, browseButton, flashCheckbox1, input4, browseButton3), outputTextArea, nil, nil, container.NewVBox(buttonContainer))
 
 	// Set the layout as the content of the window
 	w.Resize(fyne.NewSize(920, 400))
